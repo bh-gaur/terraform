@@ -12,7 +12,7 @@ terraform {
 }
 
 resource "aws_vpc" "main" {
-  cidr_block = "10.0.0.0/16" # Classless Inter-Domain Routing (CIDR) block
+  cidr_block = "10.0.0.0/16"
   enable_dns_support = true
   enable_dns_hostnames = true
 }
@@ -49,7 +49,7 @@ resource "aws_route_table_association" "subnet_b_assoc" {
 
 resource "aws_subnet" "subnet_a" {
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.1.0/24" # Classless Inter-Domain Routing (CIDR) block
+  cidr_block              = "10.0.1.0/24"
   availability_zone       = "us-east-1a"
   map_public_ip_on_launch = true
 }
