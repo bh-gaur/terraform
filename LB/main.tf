@@ -62,8 +62,8 @@ resource "aws_subnet" "subnet_b" {
 }
 
 # Define security group for Load Balancer
-resource "aws_security_group" "lb_sg" {
-  name        = "loadbalancer-sg"
+resource "aws_security_group" "ec2_sg" {
+  name        = "ec2-sg"
   description = "Allow inbound traffic on port 80"
   vpc_id      = aws_vpc.main.id
 
@@ -80,7 +80,7 @@ resource "aws_security_group" "lb_sg" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # Allow HTTP from all IPs
+    security_groups =  [aws_security_group.alb_sg.id]  # Allow HTTP from ALB security group
   }
 
   # Allow HTTPS (Port 443) for Secure Web Traffic
@@ -88,7 +88,7 @@ resource "aws_security_group" "lb_sg" {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # Allow HTTPS from all IPs
+    security_groups = [aws_security_group.alb_sg.id]  # Allow HTTPS from ALB security group
   }
 
   # Allow All Outbound Traffic (Necessary for Internet access)
@@ -100,7 +100,40 @@ resource "aws_security_group" "lb_sg" {
   }
 
   tags = {
-    Name = "loadbalancer-sg"
+    Name = "ec2-sg"
+  }
+}
+
+resource "aws_security_group" "alb_sg" {
+  name        = "alb-sg"
+  description = "Allow inbound traffic on port 80 for ALB"
+  vpc_id      = aws_vpc.main.id
+
+  # Allow HTTP (Port 80) for Web Traffic
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port = 443
+    to_port   = 443
+    protocol  = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Allow All Outbound Traffic (Necessary for Internet access)
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "alb-sg"
   }
 }
 
@@ -109,7 +142,7 @@ resource "aws_instance" "web_server_1" {
   ami                    = "ami-084568db4383264d4"  # Update with a valid AMI ID
   instance_type          = "t2.micro"
   subnet_id              = aws_subnet.subnet_a.id  # Reference to a subnet
-  vpc_security_group_ids = [aws_security_group.lb_sg.id]
+  vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   key_name               = "bhola-ubuntu"
 
   # User Data to install Nginx
@@ -150,7 +183,7 @@ resource "aws_instance" "web_server_2" {
   ami                    = "ami-084568db4383264d4"  # Update with a valid AMI ID
   instance_type          = "t2.micro"
   subnet_id              = aws_subnet.subnet_b.id  # Reference to another subnet
-  vpc_security_group_ids = [aws_security_group.lb_sg.id]
+  vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   key_name               = "bhola-ubuntu"
 
   # User Data to install Nginx
@@ -221,7 +254,7 @@ resource "aws_lb" "app_lb" {
   name               = "my-app-lb"
   internal           = false
   load_balancer_type = "application"
-  security_groups    = [aws_security_group.lb_sg.id]
+  security_groups    = [aws_security_group.alb_sg.id]
   subnets            = [aws_subnet.subnet_a.id, aws_subnet.subnet_b.id]
   enable_deletion_protection = false
   enable_cross_zone_load_balancing = true
