@@ -1,0 +1,259 @@
+##
+# Terraform Configuration for VPC
+##
+
+###########################################
+# Terraform Version Configuration
+###########################################
+
+terraform {
+  required_version = ">= 1.0"
+  
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+###########################################
+# AWS Provider Configuration
+###########################################
+
+provider "aws" {
+  region = var.aws_region
+}
+
+###########################################
+# VPC Configuration
+###########################################
+
+resource "aws_vpc" "networking_vpc" {
+  cidr_block           = var.vpc_cidr_block
+  enable_dns_support   = var.enable_dns_support
+  enable_dns_hostnames = var.enable_dns_hostnames
+
+  tags = {
+    Name    = var.vpc_name
+    Project = var.project_name
+  }
+}
+
+###########################################
+# Public Subnet Configuration
+###########################################
+
+resource "aws_subnet" "public_subnet_a" {
+  vpc_id            = aws_vpc.networking_vpc.id
+  cidr_block        = var.public_subnet_cidr_blocks[0]
+  availability_zone = var.availability_zones[0]
+  
+  tags = {
+    Name = var.public_subnet_names[0]
+    Project = var.project_name
+  }
+}
+
+resource "aws_subnet" "public_subnet_b" {
+  vpc_id            = aws_vpc.networking_vpc.id
+  cidr_block        = var.public_subnet_cidr_blocks[1]
+  availability_zone = var.availability_zones[1]
+  
+  tags = {
+    Name = var.public_subnet_names[1]
+    Project = var.project_name
+  }
+}
+
+###########################################
+# Private Subnet Configuration
+###########################################
+
+resource "aws_subnet" "private_subnet_a" {
+  vpc_id            = aws_vpc.networking_vpc.id
+  cidr_block        = var.private_subnet_cidr_blocks[0]
+  availability_zone = var.availability_zones[0]
+  
+  tags = {
+    Name = var.private_subnet_names[0]
+    Project = var.project_name
+  }
+}
+
+resource "aws_subnet" "private_subnet_b" {
+  vpc_id            = aws_vpc.networking_vpc.id
+  cidr_block        = var.private_subnet_cidr_blocks[1]
+  availability_zone = var.availability_zones[1]
+  
+  tags = {
+    Name = var.private_subnet_names[1]
+    Project = var.project_name
+  }
+}
+
+###########################################
+# Database Subnet Group Configuration
+###########################################
+
+resource "aws_db_subnet_group" "default" {
+  name       = "${var.project_name}-db-subnet-group"
+  subnet_ids = [aws_subnet.private_subnet_a.id, aws_subnet.private_subnet_b.id]
+
+  tags = {
+    Name    = "${var.project_name}-db-subnet-group"
+    Project = var.project_name
+  }
+}
+
+###########################################
+# Internet Gateway Configuration
+###########################################
+
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.networking_vpc.id
+  
+  tags = {
+    Name = var.internet_gateway_name
+  }
+}
+
+###########################################
+# Route Table for Public Subnets
+###########################################
+
+resource "aws_route_table" "public_rt" {
+  vpc_id = aws_vpc.networking_vpc.id
+  
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  }
+  
+  tags = {
+    Name = var.public_route_table_name
+    Project = var.project_name
+  }
+}
+
+###########################################
+# Associate Public Subnets with Route Table
+###########################################
+
+resource "aws_route_table_association" "public_subnet_a_rt_assoc" {
+  subnet_id = aws_subnet.public_subnet_a.id
+  route_table_id = aws_route_table.public_rt.id
+}
+
+resource "aws_route_table_association" "public_subnet_b_rt_assoc" {
+  subnet_id = aws_subnet.public_subnet_b.id
+  route_table_id = aws_route_table.public_rt.id
+}
+
+###########################################
+# Elastic IP for NAT Gateway
+###########################################
+
+resource "aws_eip" "nat_eip" {
+  domain = "vpc"
+  
+  tags = {
+    Name = var.nat_eip_name
+    Project = var.project_name
+  }
+}
+
+###########################################
+# NAT Gateway Configuration
+###########################################
+
+resource "aws_nat_gateway" "nat_gw" {
+  allocation_id = aws_eip.nat_eip.id
+  subnet_id     = aws_subnet.public_subnet_a.id
+  
+  tags = {
+    Name = var.nat_gateway_name
+    Project = var.project_name
+  }
+
+  depends_on = [aws_internet_gateway.igw]
+}
+
+###########################################
+# Route Table for Private Subnets
+###########################################
+
+resource "aws_route_table" "private_rt" {
+  vpc_id = aws_vpc.networking_vpc.id
+  
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.nat_gw.id
+  }
+  
+  tags = {
+    Name = var.private_route_table_name
+    Project = var.project_name
+  }
+}
+
+###########################################
+# Associate Private Subnets with Route Table
+###########################################
+
+resource "aws_route_table_association" "private_subnet_a_rt_assoc" {
+  subnet_id = aws_subnet.private_subnet_a.id
+  route_table_id = aws_route_table.private_rt.id
+}
+
+resource "aws_route_table_association" "private_subnet_b_rt_assoc" {
+  subnet_id = aws_subnet.private_subnet_b.id
+  route_table_id = aws_route_table.private_rt.id
+}
+
+###########################################
+# Security Group Configuration
+###########################################
+
+resource "aws_security_group" "eks_sg" {
+  name        = "${var.project_name}-security-group"
+  description = "Security group for web servers"
+  vpc_id      = aws_vpc.networking_vpc.id
+  
+  tags = {
+    Name    = "${var.project_name}-security-group"
+    Project = var.project_name
+  }
+  
+  ingress {
+    description = "SSH access"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = var.allow_ssh_cidr
+  }
+
+  ingress {
+    description = "HTTP access"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = var.allow_http_cidr
+  }
+
+  ingress {
+    description = "HTTPS access"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = var.allow_https_cidr
+  }
+  
+  egress {
+    description = "Outbound traffic"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
