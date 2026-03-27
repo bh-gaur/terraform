@@ -1,12 +1,41 @@
+variable "num" {
+    description = "number of instances"
+    type = number
+    default = 1
+}
+
 variable "instance_count" {
-    description = "Number of EC2 instances to create"
-    type        = number
-    default     = 1
-  
+    description = "number of instances (alias for num)"
+    type = number
+    default = 1
 }
 
 variable "ami_id" {
-    description = "The AMI ID for the EC2 instance"
-    type        = string
-    default     = "ami-04b4f1a9cf54c11d0"
+    description = "ami id of instance"
+    type = string
+    default = "ami-04b4f1a9cf54c11d0"
+}
+
+variable "instance_type" {
+    description = "type of instance"
+    type = string
+    default = "t2.micro"
+}
+
+variable "key_name" {
+    description = "key for instance"
+    type = string
+    default = "bhola-ubuntu"
+}
+
+variable "name" {
+    description = "name of instance"
+    type = string
+    default = "terraform-test-instance"
+}
+
+variable "security_groups" {
+    description = "security group for instance"
+    type = string
+    default = "default"
 }
