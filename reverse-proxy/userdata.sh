@@ -43,8 +43,12 @@ sudo apt-get update
 sudo apt-get install jenkins -y
 
 NGINX_CONFIG_FILE="/etc/nginx/conf.d/default.conf"
-# INSTANCE_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+# TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+# INSTANCE_IP=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/public-ipv4)
 INSTANCE_IP=$(curl -s ipinfo.io | grep -oP '"ip": "\K[\d.]+')
+
+echo "Public IP: $(curl -s ifconfig.me)"
+
 # Write the proxy pass configuration to the file
 echo "server {
     listen 80;
