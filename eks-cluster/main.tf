@@ -38,9 +38,7 @@ locals {
 ################################################################################
 
 # Get the current AWS region
-data "aws_region" "current" {
-  name = var.aws_region
-}
+data "aws_region" "current" {}
 
 ################################################################################
 # VPC Module
